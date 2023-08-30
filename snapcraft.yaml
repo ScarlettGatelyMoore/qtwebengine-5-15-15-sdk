@@ -1,0 +1,167 @@
+---
+name: qtwebengine-5-15-15-sdk
+version: 5.15.15
+base: core22
+summary: QtWebengine to be used as a stage snap by Qt content snap
+description: |
+ This snap contains the necessary libraries required by
+ Qt Applications.
+confinement: strict
+grade: stable
+architectures:
+  - build-on: amd64
+  - build-on: arm64
+  - build-on: armhf
+parts:
+    patches:
+        plugin: dump
+        source: snap/local/patches
+        source-type: local
+        prime:
+        - -*
+    qtconf:
+        plugin: nil
+        override-build: |
+            SDK=/snap/qt-5-15-10-sdk/current
+            install -d "$CRAFT_PART_INSTALL/usr/include/$CRAFT_ARCH_TRIPLET"
+            cp -a $SDK/usr/include/$CRAFT_ARCH_TRIPLET/qt5 "$CRAFT_PART_INSTALL/usr/include/$CRAFT_ARCH_TRIPLET"
+            install -d "$CRAFT_PART_INSTALL/usr/lib/$CRAFT_ARCH_TRIPLET"
+            cp -a $SDK/usr/lib/$CRAFT_ARCH_TRIPLET/qt5 "$CRAFT_PART_INSTALL/usr/lib/$CRAFT_ARCH_TRIPLET"
+            cat << EOF > "$CRAFT_PART_INSTALL/qt.conf"
+            [Paths]
+            Prefix=$SDK/usr
+            ArchData=lib/$CRAFT_ARCH_TRIPLET/qt5
+            Binaries=lib/qt5/bin
+            Data=share/qt5
+            Documentation=share/qt5/doc
+            Examples=lib/$CRAFT_ARCH_TRIPLET/qt5/examples
+            Headers=$CRAFT_STAGE/usr/include/$CRAFT_ARCH_TRIPLET/qt5
+            HostBinaries=lib/qt5/bin
+            HostData=$CRAFT_STAGE/usr/lib/$CRAFT_ARCH_TRIPLET/qt5
+            HostLibraries=lib/$CRAFT_ARCH_TRIPLET
+            Imports=lib/$CRAFT_ARCH_TRIPLET/qt5/imports
+            Libraries=lib/$CRAFT_ARCH_TRIPLET
+            LibraryExecutables=lib/$CRAFT_ARCH_TRIPLET/qt5/libexec
+            Plugins=lib/$CRAFT_ARCH_TRIPLET/qt5/plugins
+            Qml2Imports=lib/$CRAFT_ARCH_TRIPLET/qt5/qml
+            Settings=/etc/xdg
+            Translations=share/qt5/translations
+            EOF
+        stage:
+        - -usr/lib/$CRAFT_ARCH_TRIPLET/qt5/plugins/designer/libqwebengineview.so
+        - -usr/lib/$CRAFT_ARCH_TRIPLET/qt5/qml/QtQuick/Pdf/libpdfplugin.so
+        prime:
+        - -*
+    qtwebengine:
+        source: https://invent.kde.org/qt/qt/qtwebengine.git
+        source-tag: 5.15.15
+        plugin: nil
+        build-environment:
+        - LD_LIBRARY_PATH: $CRAFT_STAGE/usr/lib/$CRAFT_ARCH_TRIPLET:${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}}
+        - PATH: $CRAFT_STAGE/usr/bin:$PATH
+        override-build: |
+            SDK=/snap/qt-5-15-10-sdk/current
+            # Setting number of build jobs to a safe number to prevent running out of memory during QtWebengine build
+            memtotal=$(cat /proc/meminfo | awk '{print $2}' | head -n1)
+            roundedmem=$(python3 -c "print(round($memtotal/1024000.0))")
+            maxcoresformem=$(python3 -c "print(max(1, int(($roundedmem / 2)-2)))")
+            numcoreslow=$(python3 -c "print(min($maxcoresformem, $CRAFT_PARALLEL_BUILD_COUNT))")
+            /snap/qt-5-15-10-sdk/current/usr/lib/qt5/bin/qmake QMAKE_PYTHON2=python2 -qtconf "$CRAFT_STAGE/qt.conf"
+            # /snap/qt-5-15-10-sdk/current/usr/lib/qt5/bin/qmake QMAKE_EXTRA_ARGS+="-proprietary-codecs -feature-webengine-system-libvpx -webengine-jumbo-build 0 -system-opus -system-webp -system-webengine-icu -webengine-kerberos" QMAKE_PYTHON2=python2 -qtconf "$SNAPCRAFT_STAGE/qt.conf"
+            make -j$numcoreslow NINJAJOBS=-j$numcoreslow
+            make INSTALL_ROOT="$CRAFT_PART_INSTALL/tmp" install
+            cp -a "$CRAFT_PART_INSTALL/tmp$SNAPCRAFT_STAGE/." "$SNAPCRAFT_PART_INSTALL"
+            cp -a "$CRAFT_PART_INSTALL/tmp$SDK/." "$SNAPCRAFT_PART_INSTALL"
+            rm -r "$CRAFT_PART_INSTALL/tmp"
+        build-snaps:
+        - qt-5-15-10-sdk/latest/edge
+        build-packages:
+        - python3
+        - flex
+        - gperf
+        - bison
+        - python2
+        - node-less
+        - libnss3-dev
+        - libxkbcommon-x11-dev
+        - libxcb-render0-dev
+        - libxcb-image0-dev
+        - libxcb-shape0-dev
+        - libxcb-sync-dev
+        - libxcb-render-util0-dev
+        - libxcb1-dev
+        - libxcb-xfixes0-dev
+        - libxcb-icccm4-dev
+        - libxcb-keysyms1-dev
+        - libxcb-shm0-dev
+        - libxrender-dev
+        - libxcb-xinerama0
+        - libdrm-dev
+        - libxkbfile-dev
+        - libxtst-dev
+        - libxdamage-dev
+        - libpulse-dev
+        - libasound2-dev
+        - libaudio-dev
+        - libcups2-dev
+        - libdbus-1-dev
+        - libfreetype6-dev
+        - libgl1-mesa-dev
+        - libglib2.0-dev
+        - libegl1-mesa-dev
+        - libglu1-mesa-dev
+        - libice-dev
+        - libjpeg-dev
+        - libmng-dev
+        - libpng-dev
+        - libsm-dev
+        - libsqlite3-dev
+        - libssl-dev
+        - libtiff5-dev
+        - libx11-dev
+        - libx11-xcb-dev
+        - libxcursor-dev
+        - libxext-dev
+        - libxft-dev
+        - libxi-dev
+        - libxinerama-dev
+        - libxmu-dev
+        - libxrandr-dev
+        - libxt-dev
+        - libxv-dev
+        - zlib1g-dev
+        - libedit-dev
+        - libwayland-dev
+        - libwayland-egl1-mesa
+        - libmtdev-dev
+        - libudev-dev
+        - libxkbcommon-dev
+        - libxcomposite-dev
+        - libgraphite2-dev
+        - libvulkan-dev
+        after:
+        - patches
+        - qtconf
+    conditioning:
+      after: [ qtwebengine ]
+      plugin: nil
+      override-prime: |
+        set -eux
+        craftctl default
+        for PC in $(find . -path "*/pkgconfig/*.pc")
+        do
+          sed -i 's#exec_prefix=/usr#exec_prefix=${prefix}#' $PC
+          sed -i 's#includedir=$CRAFT_STAGE/usr#includedir=${prefix}#' $PC
+          sed -i 's#/snap/qt-5-15-10-sdk/current##g' $PC
+        done
+
+        sed -i 's#$CRAFT_STAGE/usr#${_qt5WebEngineCore_install_prefix}#g' usr/lib/$CRAFT_ARCH_TRIPLET/cmake/Qt5WebEngineCore/Qt5WebEngineCoreConfig.cmake
+        sed -i 's#$CRAFT_STAGE/usr#${_qt5Pdf_install_prefix}#g' usr/lib/$CRAFT_ARCH_TRIPLET/cmake/Qt5Pdf/Qt5PdfConfig.cmake
+        sed -i 's#$CRAFT_STAGE/usr#${_qt5PdfWidgets_install_prefix}#g' usr/lib/$CRAFT_ARCH_TRIPLET/cmake/Qt5PdfWidgets/Qt5PdfWidgetsConfig.cmake
+        sed -i 's#$CRAFT_STAGE/usr#${_qt5WebEngine_install_prefix}#g' usr/lib/$CRAFT_ARCH_TRIPLET/cmake/Qt5WebEngine/Qt5WebEngineConfig.cmake
+        sed -i 's#$CRAFT_STAGE/usr#${_qt5WebEngineWidgets_install_prefix}#g' usr/lib/$CRAFT_ARCH_TRIPLET/cmake/Qt5WebEngineWidgets/Qt5WebEngineWidgetsConfig.cmake
+        sed -i 's#5.15.15 ${_Qt5WebEngineCore_FIND_VERSION_EXACT}#5.15.10 ${_Qt5WebEngineCore_FIND_VERSION_EXACT}#' usr/lib/$CRAFT_ARCH_TRIPLET/cmake/Qt5WebEngineCore/Qt5WebEngineCoreConfig.cmake
+        sed -i 's#5.15.15 ${_Qt5Pdf_FIND_VERSION_EXACT}#5.15.10 ${_Qt5Pdf_FIND_VERSION_EXACT}#' usr/lib/$CRAFT_ARCH_TRIPLET/cmake/Qt5Pdf/Qt5PdfConfig.cmake
+        sed -i 's#5.15.15 ${_Qt5PdfWidgets_FIND_VERSION_EXACT}#5.15.10 ${_Qt5PdfWidgets_FIND_VERSION_EXACT}#' usr/lib/$CRAFT_ARCH_TRIPLET/cmake/Qt5PdfWidgets/Qt5PdfWidgetsConfig.cmake
+        sed -i 's#5.15.15 ${_Qt5WebEngine_FIND_VERSION_EXACT}#5.15.10 ${_Qt5WebEngine_FIND_VERSION_EXACT}#' usr/lib/$CRAFT_ARCH_TRIPLET/cmake/Qt5WebEngine/Qt5WebEngineConfig.cmake
+        sed -i 's#5.15.15 ${_Qt5WebEngineWidgets_FIND_VERSION_EXACT}#5.15.10 ${_Qt5WebEngineWidgets_FIND_VERSION_EXACT}#' usr/lib/$CRAFT_ARCH_TRIPLET/cmake/Qt5WebEngineWidgets/Qt5WebEngineWidgetsConfig.cmake
